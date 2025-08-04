@@ -7,7 +7,7 @@ import json
 from sklearn.model_selection import train_test_split
 import conf
 
-bot = telebot.TeleBot(conf.tolen)
+bot = telebot.TeleBot(conf.token)
 
 #conn = http.client.HTTPSConnection("streaming-availability.p.rapidapi.com")
 
