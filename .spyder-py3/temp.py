@@ -6,6 +6,8 @@ import config
 import json
 from sklearn.model_selection import train_test_split
 import conf
+import matplotlib.pyplot as plt
+import os
 
 bot = telebot.TeleBot(conf.token)
 
@@ -48,7 +50,7 @@ def send_welcome(message):
 @bot.message_handler(commands=['csv'])
 def csv_fail(message):
     bot.send_message(message.chat.id, "Тестовый файл:")
-    bot.send_document(message.chat.id, open("C:/Users/vikto/Downloads/grants.csv", "rb"))
+    bot.send_document(message.chat.id, open("C:/Users/vikto/Downloads/titanic.csv", "rb"))
                      
     bot.send_message(message.chat.id,
                          "Тестовый файл можно скачать и использовать для тестирования возможностей бота.\n !Данный бот не осуществляет сбор и хранение данных пользователей!\n Если у вас имеется свой собственный датасет, присылайте файл в чат бота.")
@@ -77,6 +79,7 @@ def handle_document(message):
                 bot.send_message(message.chat.id,"CSV файл успешно загружен!")
                 header = list(df.columns)
                 types_element = list(df.dtypes)
+                print(df.columns)
                 bot.send_message(message.chat.id, "В вашем файле есть параметры:")
                 for i in range(len(header)):
                     bot.send_message(message.chat.id, f"\n{i+1}) {header[i]}, {types_element[i]}")
@@ -114,8 +117,8 @@ def parametr(message, df):
                     btn3 = types.KeyboardButton("Стратифицированная (расслоённая) выборка")
                     btn4 = types.KeyboardButton("Кластерная выборка")
                     markup.add(btn1, btn2, btn3, btn4)
-                    bot.send_message(message.chat.id, "Генеральная совокупность имеет слишком большой объём.\nКакую выборку сформировать?".format(message.from_user), reply_markup=markup)
-                    bot.register_next_step_handler(message, lambda msg: btn(msg, subset))
+                    bot.send_message(message.chat.id, "Генеральная совокупность имеет слишком большой объём.\nКакую выборку сформировать?", reply_markup=markup)
+                    bot.register_next_step_handler(message, lambda msg: btn(msg, subset, indices, df))
             else:
                 bot.send_message(message.chat.id, "Некоторые номера параметров вне допустимого диапазона.")
         
@@ -125,7 +128,7 @@ def parametr(message, df):
         bot.send_message(message.chat.id, "Вы не ввели никаких параметров.")
         
         
-def btn(message, subset):
+def btn(message, subset, indices, df):
     if (message.text == "Простая случайная выборка"):
         df_subset = subset.sample(n=100)
         print(df_subset)
@@ -141,6 +144,41 @@ def btn(message, subset):
         for i in range(len(header)):
             bot.send_message(message.chat.id, f"\n{i+1}) {header[i]}, {types_element[i]}")
             bot.register_next_step_handler(message, lambda msg:  stratificic(msg, subset))
+    elif (message.text == "Кластерная выборка"):
+        
+        # Вычисление статистик
+        mode = subset.mode()  # Мода
+        median = subset.median()  # Медиана
+        mean = subset.mean()  # Среднее
+        std_dev = subset.std()  # Стандартное отклонение
+        min_value = subset.min()  # Минимум
+        max_value = subset.max()  # Максимум
+        
+        
+        #ДИАГРАММА РАССЕЯНИЯ
+        plt.figure(figsize=(10, 6))
+        colors = {'male': 'blue', 'female': 'red'}
+        subset['Цвет'] = df['Sex'].map(colors)
+        subset.dropna()
+        plt.scatter(subset[subset.columns[1]], subset[subset.columns[0]], alpha=0.6, c=subset['Цвет'])
+        plt.title('Диаграмма рассеяния: ')
+        plt.xlabel('')
+        plt.ylabel('')
+        plt.grid()
+        plt.savefig('plot.png')
+        with open('plot.png', 'rb') as file:
+            bot.send_photo(message.chat.id, photo=file)
+        plt.show()
+        os.remove('plot.png')
+        
+        bot.send_message(message.chat.id, f"Мода: {mode}\n")
+        bot.send_message(message.chat.id, f"\nМедиана:{median}\n")
+        bot.send_message(message.chat.id, f"\nСреднее: {mean}\n")
+        bot.send_message(message.chat.id, f"\nСтандартное отклонение: {std_dev}\n")
+        bot.send_message(message.chat.id, f"\nМинимум: {min_value}\n")
+        bot.send_message(message.chat.id, f"\nМаксимум: {max_value}\n")
+        
+                    
             
         
         
