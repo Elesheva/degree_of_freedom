@@ -11,26 +11,7 @@ import os
 
 bot = telebot.TeleBot(conf.token)
 
-#conn = http.client.HTTPSConnection("streaming-availability.p.rapidapi.com")
-
-#headers = {
-    #'x-rapidapi-key': "3b37b78c84msha8e835899f37b8ap1d71ffjsn882b016592aa",
-    #'x-rapidapi-host': "streaming-availability.p.rapidapi.com"
-#}
-
-#conn.request("GET", "/shows/tt0068646", headers=headers)
-
-#res = conn.getresponse()
-#data = res.read()
-#print(data.decode("utf-8"))
-#json_data = json.loads(data.decode("utf-8"))
-#print(json_data)
-
-#print("Название шоу:", json_data.get('title'))
-#print("Год выпуска:", json_data.get('year'))
-#print("Описание:", json_data.get('overview'))
-#print("Нет данных о шоу.")
-
+df_subset = None
 
 # ПРИВЕТСВИЕ 
 @bot.message_handler(commands=['start'])
@@ -108,17 +89,18 @@ def parametr(message, df):
             if all(0 <= index < df.shape[1] for index in indices):
                 subset = df.iloc[:, indices]  # Извлекаем столбцы по индексам
                 print(subset)
-                bot.send_message(message.chat.id, f"{subset}\nВаш сабсет данных готов.\n")
             
                 if len(subset)> 500:
-                    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+                    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
                     btn1 = types.KeyboardButton("Простая случайная выборка")
                     btn2 = types.KeyboardButton("Систематическая выборка")
                     btn3 = types.KeyboardButton("Стратифицированная (расслоённая) выборка")
                     btn4 = types.KeyboardButton("Кластерная выборка")
                     markup.add(btn1, btn2, btn3, btn4)
-                    bot.send_message(message.chat.id, "Генеральная совокупность имеет слишком большой объём.\nКакую выборку сформировать?", reply_markup=markup)
+                    bot.send_message(message.chat.id, "\n\nКакую выборку сформировать?", reply_markup=markup)
                     bot.register_next_step_handler(message, lambda msg: btn(msg, subset, indices, df))
+                else:
+                    bot.send_message(message.chat.id, f"{subset}\n\nВаш сабсет готов.\n")
             else:
                 bot.send_message(message.chat.id, "Некоторые номера параметров вне допустимого диапазона.")
         
@@ -129,6 +111,7 @@ def parametr(message, df):
         
         
 def btn(message, subset, indices, df):
+    global df_subset
     if (message.text == "Простая случайная выборка"):
         df_subset = subset.sample(n=100)
         print(df_subset)
@@ -145,44 +128,11 @@ def btn(message, subset, indices, df):
             bot.send_message(message.chat.id, f"\n{i+1}) {header[i]}, {types_element[i]}")
             bot.register_next_step_handler(message, lambda msg:  stratificic(msg, subset))
     elif (message.text == "Кластерная выборка"):
-        
-        # Вычисление статистик
-        mode = subset.mode()  # Мода
-        median = subset.median()  # Медиана
-        mean = subset.mean()  # Среднее
-        std_dev = subset.std()  # Стандартное отклонение
-        min_value = subset.min()  # Минимум
-        max_value = subset.max()  # Максимум
-        
-        
-        #ДИАГРАММА РАССЕЯНИЯ
-        plt.figure(figsize=(10, 6))
-        colors = {'male': 'blue', 'female': 'red'}
-        subset['Цвет'] = df['Sex'].map(colors)
-        subset.dropna()
-        plt.scatter(subset[subset.columns[1]], subset[subset.columns[0]], alpha=0.6, c=subset['Цвет'])
-        plt.title('Диаграмма рассеяния: ')
-        plt.xlabel('')
-        plt.ylabel('')
-        plt.grid()
-        plt.savefig('plot.png')
-        with open('plot.png', 'rb') as file:
-            bot.send_photo(message.chat.id, photo=file)
-        plt.show()
-        os.remove('plot.png')
-        
-        bot.send_message(message.chat.id, f"Мода: {mode}\n")
-        bot.send_message(message.chat.id, f"\nМедиана:{median}\n")
-        bot.send_message(message.chat.id, f"\nСреднее: {mean}\n")
-        bot.send_message(message.chat.id, f"\nСтандартное отклонение: {std_dev}\n")
-        bot.send_message(message.chat.id, f"\nМинимум: {min_value}\n")
-        bot.send_message(message.chat.id, f"\nМаксимум: {max_value}\n")
-        
-                    
-            
-        
-        
+        pass
+    
+    
 def stratificic(message, subset):
+    global df_subset
     text = message.text.split()      
     if text:
         try:
@@ -190,12 +140,76 @@ def stratificic(message, subset):
             indices = [int(i) - 1 for i in text] 
              
             if all(0 <= index < subset.shape[1] for index in indices):
-                subset = subset.iloc[:, indices]  # Извлекаем столбцы по индексам
-                print(subset) 
+                df_subset = subset.iloc[:, indices]  # Извлекаем столбцы по индексам
+                print(df_subset)
+                bot.send_message(message.chat.id, f"{df_subset
+        }")
+                
         
         finally:
             print(Exception())
+                
+@bot.message_handler(commands=['clean'])
+def clean(message):
+    null_subset = df_subset.isnull().sum() #Пропуски
+    duplic = df_subset.duplicated().sum() #Дубли
+    NA_subset = df_subset.isna().sum() #NA
+    
+    
+    bot.send_message(message.chat.id, f"Пропуски:/n/n{null_subset}")     
+    bot.send_message(message.chat.id, f"Повторения:/n/n{duplic}")
+    
+      
             
+            
+            
+@bot.message_handler(commands=['Descriptive_statistics'])
+def opisatelnaya_statistica(message):
+    # Вычисление статистик
+    mode = df_subset.mode()  # Мода
+    median = df_subset.median()  # Медиана
+    mean = df_subset.mean()  # Среднее
+    std_dev = df_subset.std()  # Стандартное отклонение
+    min_value = df_subset.min()  # Минимум
+    max_value = df_subset.max()  # Максимум
+    
+    #ОПИСАТЕЛЬНАЯ СТАТИСТИКА ВЫВОД
+    bot.send_message(message.chat.id, f"Мода:\n{mode}")
+    bot.send_message(message.chat.id, f"\nМедиана:\n{median}")
+    bot.send_message(message.chat.id, f"\nСреднее:\n{mean}")
+    bot.send_message(message.chat.id, f"\nСтандартное отклонение:\n{std_dev}")
+    bot.send_message(message.chat.id, f"\nМинимум:\n{min_value}")
+    bot.send_message(message.chat.id, f"\nМаксимум:\n{max_value}")
+            
+
+
+
+
+
+    
+@bot.message_handler(commands=['scatter'])
+def scatter_plot(message):
+    #ДИАГРАММА РАССЕЯНИЯ
+    plt.figure(figsize=(10, 6))
+    colors = {'male': 'blue', 'female': 'red'}
+    df_subset['Цвет'] = df['Sex'].map(colors)
+    subset.dropna()
+    plt.scatter(subset[subset.columns[1]], subset[subset.columns[0]], alpha=0.6, c=subset['Цвет'])
+    plt.title('Диаграмма рассеяния: ')
+    plt.xlabel('')
+    plt.ylabel('')
+    plt.grid()
+    plt.savefig('plot.png')
+    with open('plot.png', 'rb') as file:
+        bot.send_photo(message.chat.id, photo=file)
+    plt.show()
+    os.remove('plot.png')
+
+                    
+            
+        
+        
+
         
         
         
