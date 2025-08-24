@@ -100,7 +100,9 @@ def parametr(message, df):
                     bot.send_message(message.chat.id, "\n\nКакую выборку сформировать?", reply_markup=markup)
                     bot.register_next_step_handler(message, lambda msg: btn(msg, subset, indices, df))
                 else:
-                    bot.send_message(message.chat.id, f"{subset}\n\nВаш сабсет готов.\n")
+                    global df_subset
+                    df_subset = subset
+                    bot.send_message(message.chat.id, f"{subset}\n\nВаш датасет готов.\n")
             else:
                 bot.send_message(message.chat.id, "Некоторые номера параметров вне допустимого диапазона.")
         
@@ -149,44 +151,45 @@ def stratificic(message, subset):
         finally:
             print(Exception())
                 
+            
 @bot.message_handler(commands=['clean'])
 def clean(message):
     null_subset = df_subset.isnull().sum() #Пропуски
     duplic = df_subset.duplicated().sum() #Дубли
-    NA_subset = df_subset.isna().sum() #NA
-    
     
     bot.send_message(message.chat.id, f"Пропуски:/n/n{null_subset}")     
     bot.send_message(message.chat.id, f"Повторения:/n/n{duplic}")
     
-      
-            
             
             
 @bot.message_handler(commands=['Descriptive_statistics'])
 def opisatelnaya_statistica(message):
     # Вычисление статистик
-    mode = df_subset.mode()  # Мода
-    median = df_subset.median()  # Медиана
-    mean = df_subset.mean()  # Среднее
-    std_dev = df_subset.std()  # Стандартное отклонение
-    min_value = df_subset.min()  # Минимум
-    max_value = df_subset.max()  # Максимум
+    statis = df_subset.describe(include='all')
     
     #ОПИСАТЕЛЬНАЯ СТАТИСТИКА ВЫВОД
-    bot.send_message(message.chat.id, f"Мода:\n{mode}")
-    bot.send_message(message.chat.id, f"\nМедиана:\n{median}")
-    bot.send_message(message.chat.id, f"\nСреднее:\n{mean}")
-    bot.send_message(message.chat.id, f"\nСтандартное отклонение:\n{std_dev}")
-    bot.send_message(message.chat.id, f"\nМинимум:\n{min_value}")
-    bot.send_message(message.chat.id, f"\nМаксимум:\n{max_value}")
+    bot.send_message(message.chat.id, f"\n{statis}")
             
 
-
-
-
-
-    
+@bot.message_handler(commands=['histogram'])
+def histogramma(message):
+    if len(df_subset.columns) == 1 and df_subset.dtypes[0] == 'int64' or 'flout64':
+        plt.hist(df_subset, bins=30, alpha=0.7, color='blue', edgecolor='black')
+        plt.title('Гистограмма')
+        plt.xlabel(f'{df_subset.columns[0]}')
+        plt.ylabel('Частота')
+        plt.grid(axis='y', alpha=0.75)
+        plt.savefig('plot.png')
+        with open('plot.png', 'rb') as file:
+            bot.send_photo(message.chat.id, photo=file)
+        plt.show()
+        os.remove('plot.png')
+    else:
+        print("AAAAAAAAAAA")
+        
+        
+        
+        
 @bot.message_handler(commands=['scatter'])
 def scatter_plot(message):
     #ДИАГРАММА РАССЕЯНИЯ
